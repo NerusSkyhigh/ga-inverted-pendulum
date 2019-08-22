@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 @njit(nopython=True)
 def rigidBodyForce2D(xc:np.ndarray, xp:np.ndarray, length:float) -> np.ndarray:
     '''
-    Force generate by a stick of length 1
+    Force generate by a stick of length "length"
     '''
     force2D = np.empty(2)
     distance = norm(xc-xp)
@@ -66,13 +66,19 @@ if __name__ == "__main__":
     
     mc = 10000
     mp = 100
-    me = 1 # massa estremo
+    me = 1
     
     xc = np.zeros([points, 2]) # Center position [t, [x, y]]
     xp = np.zeros([points, 2]) # Pendulum position [t, [x, y]]
     xe = np.zeros([points, 2]) # Pendulum  extremum position [t, [x, y]]
-    vc = np.zeros([points, 2]);		vp = np.zeros([points, 2]);		ve = np.zeros([points, 2])
-    Fp = np.zeros([points, 2]);		Fc = np.zeros([points, 2]);		Fe = np.zeros([points, 2])
+    
+    vc = np.zeros([points, 2])
+    vp = np.zeros([points, 2])
+    ve = np.zeros([points, 2])
+    
+    Fp = np.zeros([points, 2])
+    Fc = np.zeros([points, 2])
+    Fe = np.zeros([points, 2])
     
     distCP=np.zeros([points-1, 1])
     distPE=np.zeros([points-1, 1])
@@ -87,8 +93,8 @@ if __name__ == "__main__":
     
     Fp[0], distCP[0] = rigidBodyForce2D(xc=xc[0], xp=xp[0], length=1)
     Fe[0], distPE[0] = rigidBodyForce2D(xc=xp[0], xp=xe[0], length=0.5)
-    Fp[0] = Gravity2D(m=mp)
-    Fe[0] = Gravity2D(m=me)
+    Fp[0, 1] = Gravity2D(m=mp)
+    Fe[0, 1] = Gravity2D(m=me)
 
     
     xc[1], _ = euler(x=xc, v=vc, F=Fc[0], m=mc, k=0, dt=dt)
@@ -99,24 +105,29 @@ if __name__ == "__main__":
         F_barPE, distPE[i] = rigidBodyForce2D(xc=xp[i], xp=xe[i], length=0.5)
         F_barCP, distCP[i] = rigidBodyForce2D(xc=xc[i], xp=xp[i], length=1)
         
-        Fe[i] = Gravity2D(m=me) + F_barPE 
-        Fp[i] = Gravity2D(m=mp) + F_barCP - Fe[i]
+        Fe[i] = F_barPE
+        Fe[i,1] += Gravity2D(m=me)
+        
+        Fp[i] = F_barCP - Fe[i]
+        Fp[i, 1] += Gravity2D(m=mp)
+
         Fc[i] = - Fp[i]
 
+        # Armonic oscillation around origin
         Fc[i, 0] = Fc[i, 0] - 1*1e4*xc[i, 0]
         Fc[i, 1] = Fc[i, 1] - 1*1e6*xc[i, 1]
         
-        
         #euler(x=xc, v=vc, F=Fc[i], m=mc, k=i, dt=dt)
         #euler(x=xp, v=vp, F=Fp[i], m=mp, k=i, dt=dt)
-        
+        #euler(x=xe, v=ve, F=Fe[i], m=me, k=i, dt=dt)
+
         verlet(x=xc, F=Fc[i], m=mc, k=i, dt=dt)
         verlet(x=xp, F=Fp[i], m=mp, k=i, dt=dt)
         verlet(x=xe, F=Fe[i], m=me, k=i, dt=dt)
         
     plt.figure(figsize=(12, 5))
     plt.plot(range(points-1), distPE-0.5, lw=0.5)
-    plt.title("Differenza lunghezza PE")
+    plt.title("P-E length error")
     plt.xlabel("iteration")
     plt.ylabel(r"$\Delta$ $L_{PE}$")
     plt.grid(True)
@@ -124,7 +135,7 @@ if __name__ == "__main__":
     
     plt.figure(figsize=(12, 5))
     plt.plot(range(points-1), distCP-1, lw=0.5)
-    plt.title("Differenza lunghezza CP")
+    plt.title("C-P length error")
     plt.xlabel("iteration")
     plt.ylabel(r"$\Delta$ $L_{CE}$")
     plt.grid(True)
